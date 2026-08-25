@@ -1,3 +1,8 @@
-# Godot 4+ specific ignores
+.sconsign.dblite
+bin/
+build/
+third_party/ffmpeg/
+*.os
+
 .godot/
-/android/
+*.import

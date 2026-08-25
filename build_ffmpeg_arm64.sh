@@ -4,7 +4,7 @@ set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FFMPEG_DIR="$PROJECT_ROOT/third_party/ffmpeg"
-INSTALL_DIR="$PROJECT_ROOT/build/ffmpeg"
+INSTALL_DIR="$PROJECT_ROOT/build/ffmpeg/arm64"
 
 echo "==> FFmpeg source:  $FFMPEG_DIR"
 echo "==> Install path:   $INSTALL_DIR"
@@ -40,7 +40,6 @@ echo "==> Configuring FFmpeg..."
     --disable-encoders \
     --disable-muxers \
     --disable-network \
-    --disable-x86asm
 
 echo "==> Building FFmpeg..."
 make -j"$(nproc)"
