@@ -1,7 +1,6 @@
 .sconsign.dblite
 bin/
 build/
-third_party/ffmpeg/
 godot-cpp/
 *.os
 
