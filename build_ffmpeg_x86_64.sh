@@ -40,7 +40,14 @@ echo "==> Configuring FFmpeg..."
     --disable-encoders \
     --disable-muxers \
     --disable-network \
-    --disable-x86asm
+    --disable-x86asm \
+    --disable-zlib \
+    --disable-bzlib \
+    --disable-lzma \
+    --disable-vaapi \
+    --disable-vdpau \
+    --disable-libdrm \
+    --disable-xlib 
 
 echo "==> Building FFmpeg..."
 make -j"$(nproc)"

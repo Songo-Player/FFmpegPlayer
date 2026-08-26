@@ -3,6 +3,7 @@ import os
 
 env = SConscript("godot-cpp/SConstruct")
 
+
 # --------------------------------------------------
 # Architecture
 # --------------------------------------------------
@@ -35,8 +36,20 @@ ffmpeg_dir = os.path.join(
     ffmpeg_arch,
 )
 
-ffmpeg_lib_dir = os.path.join(ffmpeg_dir, "lib")
-ffmpeg_include_dir = os.path.join(ffmpeg_dir, "include")
+ffmpeg_lib_dir = os.path.join(
+    ffmpeg_dir,
+    "lib",
+)
+
+ffmpeg_include_dir = os.path.join(
+    ffmpeg_dir,
+    "include",
+)
+
+
+# --------------------------------------------------
+# Include paths
+# --------------------------------------------------
 
 env.Append(
     CPPPATH=[
@@ -45,39 +58,57 @@ env.Append(
     ]
 )
 
-# Use the exact static archives.
+
+# --------------------------------------------------
+# FFmpeg static libraries
+# --------------------------------------------------
+
+# Use SCons File nodes so these are treated as actual
+# archive files rather than library names (-l...).
+#
+# Keeping these in LIBS causes SCons to place them after
+# the extension's object files on the linker command line.
+
 ffmpeg_static_libs = [
-    os.path.join(ffmpeg_lib_dir, "libavformat.a"),
-    os.path.join(ffmpeg_lib_dir, "libavcodec.a"),
-    os.path.join(ffmpeg_lib_dir, "libswresample.a"),
-    os.path.join(ffmpeg_lib_dir, "libavutil.a"),
+    env.File(os.path.join(ffmpeg_lib_dir, "libavformat.a")),
+    env.File(os.path.join(ffmpeg_lib_dir, "libavcodec.a")),
+    env.File(os.path.join(ffmpeg_lib_dir, "libswresample.a")),
+    env.File(os.path.join(ffmpeg_lib_dir, "libavutil.a")),
 ]
 
 
 # --------------------------------------------------
-# Platform-specific FFmpeg linking
+# Platform-specific linking
 # --------------------------------------------------
 
 if env["platform"] == "linux":
+
     env.Append(
         LINKFLAGS=[
-            "-Wl,--start-group",
-            *ffmpeg_static_libs,
-            "-Wl,--end-group",
+            # FFmpeg's x86_64 CABAC code contains PC-relative
+            # references to internal FFmpeg symbols. Treat symbols
+            # defined by this shared library as non-preemptible.
+            "-Wl,-Bsymbolic",
         ]
     )
 
     env.Append(
         LIBS=[
+            *ffmpeg_static_libs,
             "pthread",
             "m",
             "dl",
         ]
     )
 
+
 elif env["platform"] == "macos":
+
     env.Append(
-        LINKFLAGS=ffmpeg_static_libs + [
+        LIBS=[
+            *ffmpeg_static_libs,
+        ],
+        LINKFLAGS=[
             "-framework", "CoreFoundation",
             "-framework", "CoreVideo",
             "-framework", "CoreMedia",
@@ -87,13 +118,12 @@ elif env["platform"] == "macos":
         ]
     )
 
+
 elif env["platform"] == "windows":
-    env.Append(
-        LINKFLAGS=ffmpeg_static_libs
-    )
 
     env.Append(
         LIBS=[
+            *ffmpeg_static_libs,
             "bcrypt",
             "ws2_32",
             "secur32",
@@ -113,6 +143,7 @@ sources = Glob("src/*.cpp")
 # --------------------------------------------------
 
 if env["platform"] == "macos":
+
     library_path = (
         "bin/libffmpegplayer.{}.{}.framework/"
         "libffmpegplayer.{}.{}"
@@ -122,12 +153,18 @@ if env["platform"] == "macos":
         env["platform"],
         env["target"],
     )
+
 else:
+
     library_path = "bin/libffmpegplayer{}{}".format(
         env["suffix"],
         env["SHLIBSUFFIX"],
     )
 
+
+# --------------------------------------------------
+# Build shared library
+# --------------------------------------------------
 
 library = env.SharedLibrary(
     library_path,
