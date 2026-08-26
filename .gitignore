@@ -1,7 +1,6 @@
 .sconsign.dblite
 bin/
 build/
-godot-cpp/
 *.os
 
 .godot/
