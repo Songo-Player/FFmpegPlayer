@@ -21,9 +21,12 @@ void FFMPEGPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_playback_position"), &FFMPEGPlayer::get_playback_position);
 	ClassDB::bind_method(D_METHOD("get_generator"), &FFMPEGPlayer::get_generator);
 	ClassDB::bind_method(D_METHOD("get_player"), &FFMPEGPlayer::get_player);
+	ClassDB::bind_method(D_METHOD("set_force_44100hz", "force"), &FFMPEGPlayer::set_force_44100hz);
+	ClassDB::bind_method(D_METHOD("get_force_44100hz"), &FFMPEGPlayer::get_force_44100hz);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "generator", PROPERTY_HINT_RESOURCE_TYPE, "AudioStreamGenerator"), "", "get_generator");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "player", PROPERTY_HINT_RESOURCE_TYPE, "AudioStreamPlayer"), "", "get_player");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "force_44100hz"), "set_force_44100hz", "get_force_44100hz");
 }
 
 void FFMPEGPlayer::test_ffmpeg() {
@@ -101,12 +104,16 @@ void FFMPEGPlayer::play(String path, double seek_time) {
 	avcodec_parameters_to_context(codec_ctx, codecpar);
 	avcodec_open2(codec_ctx, codec, nullptr);
 
-	// Set up resampler to stereo float 44100
+	// Resample to stereo float, either at the source's native rate or
+	// forced to 44100Hz, matching whatever the generator is set to below.
+	int target_rate = force_44100hz ? 44100 : codec_ctx->sample_rate;
+	generator->set_mix_rate((double)target_rate);
+
 	AVChannelLayout out_layout;
 	av_channel_layout_default(&out_layout, 2);
 	swr_alloc_set_opts2(
 			&swr,
-			&out_layout, AV_SAMPLE_FMT_FLT, 44100,
+			&out_layout, AV_SAMPLE_FMT_FLT, target_rate,
 			&codec_ctx->ch_layout, codec_ctx->sample_fmt, codec_ctx->sample_rate,
 			0, nullptr);
 	swr_init(swr);
@@ -286,6 +293,14 @@ bool FFMPEGPlayer::is_paused() const {
 
 bool FFMPEGPlayer::is_playing() const {
 	return !paused && playing;
+}
+
+void FFMPEGPlayer::set_force_44100hz(bool p_force) {
+	force_44100hz = p_force;
+}
+
+bool FFMPEGPlayer::get_force_44100hz() const {
+	return force_44100hz;
 }
 
 void FFMPEGPlayer::seek(double seconds) {

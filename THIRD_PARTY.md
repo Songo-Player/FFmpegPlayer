@@ -11,5 +11,10 @@ https://ffmpeg.org/
 FFmpeg version:
 n8.1.2
 
+The FFmpeg source corresponding to the distributed binaries is
+available at:
+
+SongoPlayer org repo link, add later
+
 The FFmpeg build used by this project is configured without GPL
 or nonfree components.

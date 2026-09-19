@@ -29,12 +29,23 @@ print("Using FFmpeg build for architecture: {}".format(ffmpeg_arch))
 
 project_root = os.getcwd()
 
-ffmpeg_dir = os.path.join(
-    project_root,
-    "build",
-    "ffmpeg",
-    ffmpeg_arch,
-)
+# Android FFmpeg builds live in a separate subdirectory so they don't
+# clobber the host (desktop) build for the same architecture.
+if env["platform"] == "android":
+    ffmpeg_dir = os.path.join(
+        project_root,
+        "build",
+        "ffmpeg",
+        "android",
+        ffmpeg_arch,
+    )
+else:
+    ffmpeg_dir = os.path.join(
+        project_root,
+        "build",
+        "ffmpeg",
+        ffmpeg_arch,
+    )
 
 ffmpeg_lib_dir = os.path.join(
     ffmpeg_dir,
@@ -127,6 +138,29 @@ elif env["platform"] == "windows":
             "bcrypt",
             "ws2_32",
             "secur32",
+        ]
+    )
+
+
+elif env["platform"] == "android":
+
+    env.Append(
+        LINKFLAGS=[
+            # Same rationale as the linux branch: keep this shared
+            # library's own symbols non-preemptible.
+            "-Wl,-Bsymbolic",
+        ]
+    )
+
+    # Android's libc provides pthread; "log" is needed for FFmpeg's
+    # Android logging hook, "android" for any NDK platform calls.
+    env.Append(
+        LIBS=[
+            *ffmpeg_static_libs,
+            "log",
+            "android",
+            "m",
+            "dl",
         ]
     )
 

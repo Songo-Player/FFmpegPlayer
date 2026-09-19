@@ -49,6 +49,7 @@ private:
 	mutable std::mutex mutex;
 	uint64_t frames_played = 0;
 	String current_path;
+	bool force_44100hz = false;
 
 public:
 	void test_ffmpeg();
@@ -62,6 +63,9 @@ public:
 	bool is_paused() const;
 	bool is_playing() const;
 	double get_playback_position() const;
+
+	void set_force_44100hz(bool p_force);
+	bool get_force_44100hz() const;
 
 	Ref<AudioStreamGenerator> get_generator() const { return generator; }
 	AudioStreamPlayer *get_player() const { return player; }
