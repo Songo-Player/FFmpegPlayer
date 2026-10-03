@@ -6,6 +6,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FFMPEG_DIR="$PROJECT_ROOT/third_party/ffmpeg"
 INSTALL_DIR="$PROJECT_ROOT/build/ffmpeg/android/arm64"
 
+# mbedTLS provides https:// support; build it first with build_mbedtls_*.sh
+MBEDTLS_INSTALL_DIR="$PROJECT_ROOT/build/mbedtls/android/arm64"
+
 # --------------------------------------------------
 # Android NDK toolchain
 # --------------------------------------------------
@@ -19,6 +22,18 @@ export PATH="$TOOLCHAIN/bin:$PATH"
 echo "==> FFmpeg source:  $FFMPEG_DIR"
 echo "==> NDK toolchain:  $TOOLCHAIN"
 echo "==> Install path:   $INSTALL_DIR"
+echo "==> mbedTLS:        $MBEDTLS_INSTALL_DIR"
+
+if [ ! -f "$MBEDTLS_INSTALL_DIR/lib/libmbedtls.a" ]; then
+    echo "mbedTLS not found, run the matching build_mbedtls_*.sh first" >&2
+    exit 1
+fi
+
+# Audio-only component lists, shared with the other build_ffmpeg_*.sh scripts
+source "$PROJECT_ROOT/ffmpeg_audio_components.sh"
+
+# Only let configure see our static mbedTLS, never a system copy.
+export PKG_CONFIG_LIBDIR="$MBEDTLS_INSTALL_DIR/lib/pkgconfig"
 
 cd "$FFMPEG_DIR"
 
@@ -31,6 +46,7 @@ rm -rf "$INSTALL_DIR"
 echo "==> Configuring FFmpeg for android-arm64 (aarch64)..."
 
 ./configure \
+    --pkg-config-flags="--static" \
     --prefix="$INSTALL_DIR" \
     --enable-cross-compile \
     --target-os=android \
@@ -52,6 +68,7 @@ echo "==> Configuring FFmpeg for android-arm64 (aarch64)..."
     --extra-cflags="-fPIC -O3" \
     --disable-gpl \
     --disable-nonfree \
+    --enable-version3 \
     --disable-avdevice \
     --disable-avfilter \
     --disable-swscale \
@@ -60,8 +77,14 @@ echo "==> Configuring FFmpeg for android-arm64 (aarch64)..."
     --enable-avutil \
     --enable-swresample \
     --disable-encoders \
+    --disable-decoders \
+    --enable-decoder="$FFMPEG_AUDIO_DECODERS" \
+    --disable-parsers \
+    --enable-parser="$FFMPEG_AUDIO_PARSERS" \
+    --disable-demuxer="$FFMPEG_IMAGE_DEMUXERS" \
     --disable-muxers \
-    --disable-network \
+    --enable-network \
+    --enable-mbedtls \
     --disable-zlib \
     --disable-bzlib \
     --disable-lzma \

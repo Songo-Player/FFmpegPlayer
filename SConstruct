@@ -57,6 +57,18 @@ ffmpeg_include_dir = os.path.join(
     "include",
 )
 
+# mbedTLS provides FFmpeg's https:// support and lives in a matching
+# build/mbedtls/... directory (see build_mbedtls_*.sh).
+mbedtls_dir = ffmpeg_dir.replace(
+    os.path.join("build", "ffmpeg"),
+    os.path.join("build", "mbedtls"),
+)
+
+mbedtls_lib_dir = os.path.join(
+    mbedtls_dir,
+    "lib",
+)
+
 
 # --------------------------------------------------
 # Include paths
@@ -85,6 +97,10 @@ ffmpeg_static_libs = [
     env.File(os.path.join(ffmpeg_lib_dir, "libavcodec.a")),
     env.File(os.path.join(ffmpeg_lib_dir, "libswresample.a")),
     env.File(os.path.join(ffmpeg_lib_dir, "libavutil.a")),
+    # Order matters: libmbedtls depends on x509, which depends on crypto.
+    env.File(os.path.join(mbedtls_lib_dir, "libmbedtls.a")),
+    env.File(os.path.join(mbedtls_lib_dir, "libmbedx509.a")),
+    env.File(os.path.join(mbedtls_lib_dir, "libmbedcrypto.a")),
 ]
 
 

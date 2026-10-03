@@ -6,12 +6,19 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
+extern "C" {
+#include <libavformat/avformat.h>
+}
+
 using namespace godot;
 
 void initialize_ffmpeg_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+
+	// Required before FFmpeg opens network (http/https/hls) inputs.
+	avformat_network_init();
 
 	ClassDB::register_class<FFMPEGPlayer>();
 }
@@ -20,6 +27,8 @@ void uninitialize_ffmpeg_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+
+	avformat_network_deinit();
 }
 
 extern "C" {

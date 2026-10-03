@@ -5,3 +5,6 @@
 	path = godot-cpp
 	url = https://github.com/godotengine/godot-cpp.git
 	branch = 4.3
+[submodule "third_party/mbedtls"]
+	path = third_party/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
