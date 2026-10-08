@@ -34,6 +34,7 @@ extern "C" {
 #include <fcntl.h>
 #include <linux/input.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -61,7 +62,10 @@ const double ALSA_OPEN_TIMEOUT_SEC = 5.0;
 const int CHUNK_FRAMES = 1024;
 
 // BTN_SELECT on most gamepads, KEY_RIGHTCTRL on Miyoo-style keyboard mappings
-const int SELECT_CODES[] = { BTN_SELECT, KEY_RIGHTCTRL };
+const std::vector<int> DEFAULT_SELECT_CODES = { BTN_SELECT, KEY_RIGHTCTRL };
+// Anbernic's H700 pads (RG34XX, RG35XX Plus/H/SP, RG40XX, ...) send Select as
+// BTN_TL, and BTN_SELECT is their L2
+const std::vector<int> ANBERNIC_SELECT_CODES = { BTN_TL };
 const double SELECT_HOLD_SEC = 1.0;
 // Select+Left within this far into a song goes to the previous one instead
 const double RESTART_THRESHOLD_SEC = 3.0;
@@ -82,8 +86,14 @@ struct Playlist {
 	float eq_gains_db[GodotEQ10::BAND_COUNT] = {};
 };
 
+struct InputDevice {
+	int fd;
+	// Codes this device sends for Select
+	const std::vector<int> *select_codes;
+};
+
 struct Input {
-	std::vector<int> fds;
+	std::vector<InputDevice> devices;
 	double select_pressed_at = -1.0;
 	// Set once a Select combo fires, so finishing the combo with Select still
 	// held doesn't also count as the quit hold
@@ -107,13 +117,32 @@ double now_sec() {
 	return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-bool is_select(int code) {
-	for (int c : SELECT_CODES) {
+bool is_select(const InputDevice &device, int code) {
+	for (int c : *device.select_codes) {
 		if (c == code) {
 			return true;
 		}
 	}
 	return false;
+}
+
+bool starts_with(const char *s, const char *prefix) {
+	return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+// Picks the Select codes for a device from its evdev name. The H700 names are
+// the ones Knulli's es_input.cfg maps Select to BTN_TL for.
+const std::vector<int> *select_codes_for(int fd) {
+	char name[256] = {};
+	if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0) {
+		return &DEFAULT_SELECT_CODES;
+	}
+	if (starts_with(name, "Anbernic ") || strcmp(name, "ANBERNIC-keys") == 0 ||
+			strcmp(name, "Deeplay-keys") == 0) {
+		fprintf(stderr, "Using BTN_TL as Select for \"%s\"\n", name);
+		return &ANBERNIC_SELECT_CODES;
+	}
+	return &DEFAULT_SELECT_CODES;
 }
 
 void open_input_devices() {
@@ -129,11 +158,11 @@ void open_input_devices() {
 		// Read only, no grab, so the frontend and games still see every press
 		int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		if (fd >= 0) {
-			input.fds.push_back(fd);
+			input.devices.push_back({ fd, select_codes_for(fd) });
 		}
 	}
 	closedir(dir);
-	fprintf(stderr, "Watching %zu input devices\n", input.fds.size());
+	fprintf(stderr, "Watching %zu input devices\n", input.devices.size());
 }
 
 // D-pad press along one axis: -1 for the negative direction (left/up), 1 for
@@ -160,9 +189,9 @@ int dpad_press(const input_event &ev, int btn_neg, int btn_pos, int key_neg, int
 // hold is caught promptly.
 void poll_input() {
 	input_event ev;
-	for (int fd : input.fds) {
-		while (read(fd, &ev, sizeof(ev)) == (ssize_t)sizeof(ev)) {
-			if (ev.type == EV_KEY && is_select(ev.code)) {
+	for (const InputDevice &device : input.devices) {
+		while (read(device.fd, &ev, sizeof(ev)) == (ssize_t)sizeof(ev)) {
+			if (ev.type == EV_KEY && is_select(device, ev.code)) {
 				if (ev.value == 1) {
 					input.select_pressed_at = now_sec();
 					input.select_combo_used = false;
@@ -806,8 +835,8 @@ int main(int argc, char **argv) {
 		snd_pcm_close(pcm);
 	}
 
-	for (int fd : input.fds) {
-		close(fd);
+	for (const InputDevice &device : input.devices) {
+		close(device.fd);
 	}
 	avformat_network_deinit();
 	fprintf(stderr, "Exited\n");
